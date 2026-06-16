@@ -4,109 +4,106 @@ from kivy.app import App
  fr om kivy.clock import Clock
  fr om kivy.core.window import Window
  fr om kivy.uix.label import Label
- fr om kivy.uix.button import Button
- fr om kivy.uix.boxlayout import BoxLayout
- fr om random import randint, choice
+ fr om random import randint
 
 Window.size = (400, 700)
 
 class GameWidget(Widget):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.player = None
+        self.player_x = 180
         self.enemies = []
         self.bullets = []
         self.score = 0
         self.game_over = False
+        self.touch_x = None
         
-        # Fondo
         with self.canvas:
-            Color(0.05, 0.05, 0.15)
-            self.bg = Rectangle(pos=self.pos, size=self.size)
+            Color(0.05, 0.05, 0.2)
+            self.bg = Rectangle(pos=(0, 0), size=(400, 700))
         
-        # Jugador (nave)
+        # Jugador (nave azul)
         with self.canvas:
-            Color(0, 0.8, 1)
-            self.player = Ellipse(pos=(180, 50), size=(40, 40))
+            Color(0, 0.7, 1)
+            self.player = Ellipse(pos=(self.player_x, 60), size=(45, 45))
         
-        # Puntaje
-        self.score_label = Label(text="Puntuación: 0", font_size=24, pos=(200, 650))
+        self.score_label = Label(text="Puntuación: 0", font_size=26, bold=True, pos=(200, 660))
         self.add_widget(self.score_label)
         
-        # Iniciar juego
-        Clock.schedule_interval(self.update, 1.0 / 60.0)
-        Clock.schedule_interval(self.spawn_enemy, 1.5)
+        Clock.schedule_interval(self.update, 1.0/60)
+        Clock.schedule_interval(self.spawn_enemy, 1.2)
         
-        # Controles táctiles
         self.bind(on_touch_down=self.on_touch_down)
+        self.bind(on_touch_move=self.on_touch_move)
     
     def on_touch_down(self, instance, touch):
         if self.game_over:
-            self.restart_game()
-            return
-        
-        # Disparar
+            self.restart()
+            return True
+        self.touch_x = touch.x
+        self.shoot()
+        return True
+    
+    def on_touch_move(self, instance, touch):
+        if not self.game_over:
+            self.player_x = max(20, min(355, touch.x - 22))
+            self.player.pos = (self.player_x, 60)
+        return True
+    
+    def shoot(self):
         with self.canvas:
             Color(1, 1, 0)
-            bullet = Ellipse(pos=(self.player.pos[0] + 15, self.player.pos[1] + 40), size=(10, 20))
+            bullet = Ellipse(pos=(self.player_x + 17, 105), size=(10, 25))
             self.bullets.append(bullet)
     
     def update(self, dt):
         if self.game_over:
             return
         
-        # Mover jugador con toque
-        # (simplificado: el jugador sigue el toque)
-        
         # Mover balas
-        for bullet in self.bullets[: ]:
-            bullet.pos = (bullet.pos[0], bullet.pos[1] + 15)
-            if bullet.pos[1] > 700:
-                self.canvas.remove(bullet)
-                self.bullets.remove(bullet)
+        for b in self.bullets[:]:
+            b.pos = (b.pos[0], b.pos[1] + 18)
+            if b.pos[1] > 720:
+                self.canvas.remove(b)
+                self.bullets.remove(b)
         
         # Mover enemigos
-        for enemy in self.enemies[:]:
-            enemy.pos = (enemy.pos[0], enemy.pos[1] - 3)
-            if enemy.pos[1] < 0:
-                self.canvas.remove(enemy)
-                self.enemies.remove(enemy)
+        for e in self.enemies[:]:
+            e.pos = (e.pos[0], e.pos[1] - 4)
+            if e.pos[1] < 0:
+                self.canvas.remove(e)
+                self.enemies.remove(e)
         
-        # Colisiones
         self.check_collisions()
-        
-        # Actualizar puntaje
         self.score_label.text = f"Puntuación: {self.score}"
     
     def spawn_enemy(self, dt):
-        if self.game_over:
-            return
-        x = randint(20, 360)
+        if self.game_over: return
+        x = randint(30, 350)
         with self.canvas:
-            Color(1, 0.3, 0.3)
-            enemy = Ellipse(pos=(x, 650), size=(35, 35))
+            Color(1, 0.2, 0.2)
+            enemy = Ellipse(pos=(x, 680), size=(38, 38))
             self.enemies.append(enemy)
     
     def check_collisions(self):
-        for bullet in self.bullets[:]:
-            for enemy in self.enemies[:]:
-                if self.collide(bullet, enemy):
-                    self.canvas.remove(bullet)
-                    self.canvas.remove(enemy)
-                    self.bullets.remove(bullet)
-                    self.enemies.remove(enemy)
-                    self.score += 10
+        for b in self.bullets[:]:
+            for e in self.enemies[:]:
+                if self.collide(b, e):
+                    self.canvas.remove(b)
+                    self.canvas.remove(e)
+                    self.bullets.remove(b)
+                    self.enemies.remove(e)
+                    self.score += 15
                     break
     
-    def collide(self, obj1, obj2):
-        x1, y1 = obj1.pos
-        w1, h1 = obj1.size
-        x2, y2 = obj2.pos
-        w2, h2 = obj2.size
-        return (x1 < x2 + w2 and x1 + w1 > x2 and
-                y1 < y2 + h2 and y1 + h1 > y2)
+    def collide(self, a, b):
+        ax, ay = a.pos
+        aw, ah = a.size
+        bx, by = b.pos
+        bw, bh = b.size
+        return (ax < bx + bw and ax + aw > bx and ay < by + bh and ay + ah > by)
     
-    def restart_game(self):
+    def restart(self):
         self.game_over = False
         self.score = 0
         for obj in self.enemies + self.bullets:
